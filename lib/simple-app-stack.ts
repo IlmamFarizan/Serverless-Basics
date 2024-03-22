@@ -5,7 +5,6 @@ import * as dynamodb from "aws-cdk-lib/aws-dynamodb";
 import * as custom from "aws-cdk-lib/custom-resources";
 import { generateBatch } from "../shared/util";
 import { movies } from "../seed/movies";
-
 import { Construct } from "constructs";
 
 export class SimpleAppStack extends cdk.Stack {
@@ -66,6 +65,22 @@ export class SimpleAppStack extends cdk.Stack {
       }
     );
 
+    const getAllMoviesFn = new lambdanode.NodejsFunction(
+      this,
+      "GetAllMoviesFn",
+      {
+        architecture: lambda.Architecture.ARM_64,
+        runtime: lambda.Runtime.NODEJS_16_X,
+        entry: `${__dirname}/../lambdas/getAllMovie.ts`,
+        timeout: cdk.Duration.seconds(10),
+        memorySize: 128,
+        environment: {
+          TABLE_NAME: moviesTable.tableName,
+          REGION: "eu-west-1",
+        },
+      }
+    );
+
     const getMovieByIdURL = getMovieByIdFn.addFunctionUrl({
       authType: lambda.FunctionUrlAuthType.NONE,
       cors: {
@@ -73,10 +88,22 @@ export class SimpleAppStack extends cdk.Stack {
       },
     });
 
+    const getAllMovies = getAllMoviesFn.addFunctionUrl({
+      authType: lambda.FunctionUrlAuthType.NONE,
+      cors: {
+        allowedOrigins: ["*"],
+      },
+    });
+
     moviesTable.grantReadData(getMovieByIdFn);
+    moviesTable.grantReadData(getAllMoviesFn);
 
     new cdk.CfnOutput(this, "Get Movie Function Url", {
       value: getMovieByIdURL.url,
+    });
+
+    new cdk.CfnOutput(this, "Get All Movies Function Url", {
+      value: getAllMovies.url,
     });
   }
 }
